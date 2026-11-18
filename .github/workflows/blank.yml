@@ -1,8 +1,10 @@
-name: Build Ola Browser (GeckoView Engine)
+name: Build Ola S1 Air GeckoView Browser APK
 
 on:
   push:
-    branches: [ "**" ]
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -22,24 +24,50 @@ jobs:
     - name: Setup Gradle 8.5
       uses: gradle/actions/setup-gradle@v3
       with:
-        gradle-version: '8.5'
+        gradle-version: 8.5
 
     - name: Rebuild with GeckoView Engine & S1 Icon
-      working-directory: OlaAirBrowser-Project
       run: |
-        # 1. Add Mozilla Maven repository to settings.gradle.kts
+        # 1. Setup Gradle init script to redirect Maven Central to Google Cloud Storage mirror (bypasses 429 rate limit)
+        mkdir -p ~/.gradle/init.d
+        cat << 'EOF' > ~/.gradle/init.d/mirrors.init.gradle
+        allprojects {
+            buildscript {
+                repositories.configureEach { repo ->
+                    if (repo instanceof MavenArtifactRepository) {
+                        def url = repo.url.toString()
+                        if (url.contains("repo1.maven.org/maven2") || url.contains("repo.maven.apache.org/maven2")) {
+                            repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
+                        }
+                    }
+                }
+            }
+            repositories.configureEach { repo ->
+                if (repo instanceof MavenArtifactRepository) {
+                    def url = repo.url.toString()
+                    if (url.contains("repo1.maven.org/maven2") || url.contains("repo.maven.apache.org/maven2")) {
+                        repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
+                    }
+                }
+            }
+        }
+        EOF
+
+        # 2. Add Google Mirror and Mozilla Maven repository to settings.gradle.kts
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
                 google()
-                mavenCentral()
+                maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
                 gradlePluginPortal()
+                mavenCentral()
             }
         }
         dependencyResolutionManagement {
             repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {
                 google()
+                maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
                 mavenCentral()
                 maven { url = uri("https://maven.mozilla.org/maven2/") }
             }
@@ -48,7 +76,7 @@ jobs:
         include(":app")
         EOF
 
-        # 2. Update app/build.gradle.kts for GeckoView and Java 17
+        # 3. Update app/build.gradle.kts for GeckoView and Java 17
         cat << 'EOF' > app/build.gradle.kts
         plugins {
             id("com.android.application")
@@ -100,7 +128,7 @@ jobs:
         }
         EOF
 
-        # 3. Create Custom S1 Cockpit App Icon
+        # 4. Create Custom S1 Cockpit App Icon
         mkdir -p app/src/main/res/drawable
         cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
         <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -120,7 +148,7 @@ jobs:
         cp app/src/main/res/drawable/ic_launcher.xml app/src/main/res/drawable/ic_launcher_round.xml
         sed -i 's/@android:drawable\/sym_def_app_icon/@drawable\/ic_launcher/g' app/src/main/AndroidManifest.xml
 
-        # 4. Update activity_main.xml to use GeckoView
+        # 5. Update activity_main.xml to use GeckoView
         cat << 'EOF' > app/src/main/res/layout/activity_main.xml
         <?xml version="1.0" encoding="utf-8"?>
         <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -215,7 +243,7 @@ jobs:
         </LinearLayout>
         EOF
 
-        # 5. Write the GeckoView-powered MainActivity.kt
+        # 6. Write the GeckoView-powered MainActivity.kt
         cat << 'EOF' > app/src/main/java/com/ola/browser/MainActivity.kt
         package com.ola.browser
 
@@ -525,45 +553,46 @@ jobs:
 
                 btnClose.setOnClickListener { dialog.dismiss() }
 
-                val list = historyManager.getRecentHistory()
-                if (list.isEmpty()) {
-                    lvHistory.visibility = View.GONE
-                    tvEmpty.visibility = View.VISIBLE
-                } else {
-                    lvHistory.visibility = View.VISIBLE
-                    tvEmpty.visibility = View.GONE
+                fun reloadList() {
+                    val list = historyManager.getRecentHistory()
+                    if (list.isEmpty()) {
+                        lvHistory.visibility = View.GONE
+                        tvEmpty.visibility = View.VISIBLE
+                    } else {
+                        lvHistory.visibility = View.VISIBLE
+                        tvEmpty.visibility = View.GONE
 
-                    lvHistory.adapter = object : BaseAdapter() {
-                        override fun getCount(): Int = list.size
-                        override fun getItem(position: Int): HistoryItem = list[position]
-                        override fun getItemId(position: Int): Long = list[position].id
+                        lvHistory.adapter = object : BaseAdapter() {
+                            override fun getCount(): Int = list.size
+                            override fun getItem(position: Int): HistoryItem = list[position]
+                            override fun getItemId(position: Int): Long = list[position].id
 
-                        override fun getView(pos: Int, convertView: View?, parent: ViewGroup?): View {
-                            val view = convertView ?: LayoutInflater.from(this@MainActivity)
-                                .inflate(R.layout.item_history, parent, false)
-                            val item = getItem(pos)
+                            override fun getView(pos: Int, convertView: View?, parent: ViewGroup?): View {
+                                val view = convertView ?: LayoutInflater.from(this@MainActivity)
+                                    .inflate(R.layout.item_history, parent, false)
+                                val item = getItem(pos)
 
-                            val tvTitle = view.findViewById<TextView>(R.id.tvHistoryTitle)
-                            val tvUrl = view.findViewById<TextView>(R.id.tvHistoryUrl)
-                            val tvTime = view.findViewById<TextView>(R.id.tvHistoryTime)
-                            val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteHistoryEntry)
+                                val tvTitle = view.findViewById<TextView>(R.id.tvHistoryTitle)
+                                val tvUrl = view.findViewById<TextView>(R.id.tvHistoryUrl)
+                                val tvTime = view.findViewById<TextView>(R.id.tvHistoryTime)
+                                val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteHistoryEntry)
 
-                            tvTitle.text = item.title
-                            tvUrl.text = item.url
-                            tvTime.text = item.getFormattedTime()
+                                tvTitle.text = item.title
+                                tvUrl.text = item.url
+                                tvTime.text = item.getFormattedTime()
 
-                            view.findViewById<View>(R.id.llHistoryInfo).setOnClickListener {
-                                loadUrl(item.url)
-                                dialog.dismiss()
+                                view.findViewById<View>(R.id.llHistoryInfo).setOnClickListener {
+                                    loadUrl(item.url)
+                                    dialog.dismiss()
+                                }
+
+                                btnDelete.setOnClickListener {
+                                    historyManager.deleteEntry(item.id)
+                                    reloadList()
+                                }
+
+                                return view
                             }
-
-                            btnDelete.setOnClickListener {
-                                historyManager.deleteEntry(item.id)
-                                dialog.dismiss()
-                                showHistoryDialog()
-                            }
-
-                            return view
                         }
                     }
                 }
@@ -582,6 +611,7 @@ jobs:
                         .show()
                 }
 
+                reloadList()
                 dialog.show()
             }
 
@@ -606,10 +636,12 @@ jobs:
         }
         EOF
 
+        # 7. Compile the GeckoView APK
         gradle assembleDebug --stacktrace
 
-    - name: Upload GeckoView Version 2.0 APK
+    - name: Upload GeckoView APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: OlaAirBrowser-GeckoView-S1-APK
-        path: OlaAirBrowser-Project/app/build/outputs/apk/**/*.apk
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: error
