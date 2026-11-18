@@ -385,7 +385,7 @@ jobs:
                         } catch(e) {}
                     })();
                 """.trimIndent()
-                geckoSession.evaluateScript(script)
+                geckoSession.loadUri("javascript:" + script)
             }
 
             private fun setupListeners() {
@@ -574,7 +574,7 @@ jobs:
                         .setMessage("Clear all browsing history and session data?")
                         .setPositiveButton("Clear Everything") { _, _ ->
                             historyManager.clearAll()
-                            geckoRuntime.webResponseCache.clear()
+                            reloadList()
                             dialog.dismiss()
                             Toast.makeText(this, getString(R.string.data_cleared), Toast.LENGTH_LONG).show()
                         }
