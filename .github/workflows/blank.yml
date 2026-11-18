@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Ola Browser (GeckoView Engine)
 
 on:
   push:
@@ -24,16 +24,592 @@ jobs:
       with:
         gradle-version: '8.5'
 
-    - name: Build Android APK
+    - name: Rebuild with GeckoView Engine & S1 Icon
       working-directory: OlaAirBrowser-Project
       run: |
-        sed -i 's/compileSdk = 29/compileSdk = 34/g' app/build.gradle.kts
-        sed -i 's/view\.title/view?.title/g' app/src/main/java/com/ola/browser/MainActivity.kt
-        sed -i 's/view\.url/view?.url/g' app/src/main/java/com/ola/browser/MainActivity.kt
+        # 1. Add Mozilla Maven repository to settings.gradle.kts
+        cat << 'EOF' > settings.gradle.kts
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                google()
+                mavenCentral()
+                maven { url = uri("https://maven.mozilla.org/maven2/") }
+            }
+        }
+        rootProject.name = "OlaAirBrowser"
+        include(":app")
+        EOF
+
+        # 2. Update app/build.gradle.kts for GeckoView and Java 17
+        cat << 'EOF' > app/build.gradle.kts
+        plugins {
+            id("com.android.application")
+            id("org.jetbrains.kotlin.android")
+        }
+
+        android {
+            namespace = "com.ola.browser"
+            compileSdk = 34
+
+            defaultConfig {
+                applicationId = "com.ola.browser"
+                minSdk = 24
+                targetSdk = 29
+                versionCode = 2
+                versionName = "2.0"
+
+                ndk {
+                    abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+                }
+            }
+
+            buildTypes {
+                release {
+                    isMinifyEnabled = false
+                    isShrinkResources = false
+                    signingConfig = signingConfigs.getByName("debug")
+                }
+                debug {
+                    isMinifyEnabled = false
+                    isShrinkResources = false
+                }
+            }
+
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+
+        dependencies {
+            implementation("androidx.core:core-ktx:1.9.0")
+            implementation("androidx.appcompat:appcompat:1.6.1")
+            implementation("org.mozilla.geckoview:geckoview:125.0.20240408174943")
+        }
+        EOF
+
+        # 3. Create Custom S1 Cockpit App Icon
+        mkdir -p app/src/main/res/drawable
+        cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path android:fillColor="#12151B" android:pathData="M54,4 C26.39,4 4,26.39 4,54 C4,81.61 26.39,104 54,104 C81.61,104 104,81.61 104,54 C104,26.39 81.61,4 54,4 Z" />
+            <path android:strokeColor="#00E5FF" android:strokeWidth="3" android:fillColor="#00000000" android:pathData="M54,8 C28.6,8 8,28.6 8,54 C8,79.4 28.6,100 54,100 C79.4,100 100,79.4 100,54 C100,28.6 79.4,8 54,8 Z" />
+            <path android:strokeColor="#1F3A44" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M18,54 L90,54" />
+            <path android:strokeColor="#1F3A44" android:strokeWidth="1.5" android:fillColor="#00000000" android:pathData="M54,18 C40,32 40,76 54,90 C68,76 68,32 54,18 Z" />
+            <path android:fillColor="#00E676" android:pathData="M58,26 L36,54 L52,54 L46,82 L72,50 L56,50 Z" />
+            <path android:fillColor="#00E5FF" android:pathData="M55,32 L39,52 L50,52 L45,74 L65,49 L53,49 Z" />
+            <path android:fillColor="#FFFFFF" android:pathData="M53,38 L43,51 L50,51 L46,65 L58,49 L51,49 Z" />
+        </vector>
+        EOF
+        cp app/src/main/res/drawable/ic_launcher.xml app/src/main/res/drawable/ic_launcher_round.xml
+        sed -i 's/@android:drawable\/sym_def_app_icon/@drawable\/ic_launcher/g' app/src/main/AndroidManifest.xml
+
+        # 4. Update activity_main.xml to use GeckoView
+        cat << 'EOF' > app/src/main/res/layout/activity_main.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/bg_dark"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/navBar"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/nav_bar_height"
+                android:background="@color/bg_surface"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp">
+
+                <ImageButton
+                    android:id="@+id/btnBack"
+                    style="@style/NavButton"
+                    android:contentDescription="@string/action_back"
+                    android:src="@drawable/ic_back" />
+
+                <ImageButton
+                    android:id="@+id/btnForward"
+                    style="@style/NavButton"
+                    android:contentDescription="@string/action_forward"
+                    android:src="@drawable/ic_forward" />
+
+                <ImageButton
+                    android:id="@+id/btnReload"
+                    style="@style/NavButton"
+                    android:contentDescription="@string/action_reload"
+                    android:src="@drawable/ic_refresh" />
+
+                <ImageButton
+                    android:id="@+id/btnBookmarkStar"
+                    style="@style/NavButton"
+                    android:contentDescription="@string/action_bookmark"
+                    android:src="@drawable/ic_star" />
+
+                <EditText
+                    android:id="@+id/etUrl"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_url_bar"
+                    android:hint="@string/search_hint"
+                    android:imeOptions="actionGo"
+                    android:inputType="textUri"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:selectAllOnFocus="true"
+                    android:singleLine="true"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
+                    android:textSize="@dimen/text_regular" />
+
+                <ImageButton
+                    android:id="@+id/btnBookmarks"
+                    style="@style/NavButton"
+                    android:contentDescription="@string/action_bookmarks_list"
+                    android:src="@drawable/ic_bookmarks" />
+
+                <ImageButton
+                    android:id="@+id/btnHistory"
+                    style="@style/NavButton"
+                    android:contentDescription="@string/action_history"
+                    android:src="@drawable/ic_history" />
+
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:max="100"
+                android:progressTint="@color/progress_color"
+                android:visibility="gone" />
+
+            <org.mozilla.geckoview.GeckoView
+                android:id="@+id/geckoView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@color/bg_dark" />
+
+        </LinearLayout>
+        EOF
+
+        # 5. Write the GeckoView-powered MainActivity.kt
+        cat << 'EOF' > app/src/main/java/com/ola/browser/MainActivity.kt
+        package com.ola.browser
+
+        import android.app.Dialog
+        import android.content.Context
+        import android.graphics.Color
+        import android.graphics.drawable.ColorDrawable
+        import android.os.Bundle
+        import android.util.Patterns
+        import android.view.KeyEvent
+        import android.view.LayoutInflater
+        import android.view.View
+        import android.view.ViewGroup
+        import android.view.Window
+        import android.view.inputmethod.EditorInfo
+        import android.view.inputmethod.InputMethodManager
+        import android.widget.BaseAdapter
+        import android.widget.Button
+        import android.widget.EditText
+        import android.widget.ImageButton
+        import android.widget.ListView
+        import android.widget.ProgressBar
+        import android.widget.TextView
+        import android.widget.Toast
+        import androidx.appcompat.app.AlertDialog
+        import androidx.appcompat.app.AppCompatActivity
+        import androidx.core.content.ContextCompat
+        import org.mozilla.geckoview.GeckoRuntime
+        import org.mozilla.geckoview.GeckoSession
+        import org.mozilla.geckoview.GeckoView
+        import java.net.URLEncoder
+
+        class MainActivity : AppCompatActivity() {
+
+            private lateinit var geckoView: GeckoView
+            private lateinit var geckoSession: GeckoSession
+            private lateinit var geckoRuntime: GeckoRuntime
+
+            private lateinit var bookmarkManager: BookmarkManager
+            private lateinit var historyManager: HistoryManager
+
+            private lateinit var btnBack: ImageButton
+            private lateinit var btnForward: ImageButton
+            private lateinit var btnReload: ImageButton
+            private lateinit var btnBookmarkStar: ImageButton
+            private lateinit var etUrl: EditText
+            private lateinit var btnBookmarks: ImageButton
+            private lateinit var btnHistory: ImageButton
+            private lateinit var progressBar: ProgressBar
+
+            private var currentUrl: String = ""
+            private var currentTitle: String = ""
+            private var isLoadingPage: Boolean = false
+
+            override fun onCreate(savedInstanceState: Bundle?) {
+                super.onCreate(savedInstanceState)
+                setContentView(R.layout.activity_main)
+
+                bookmarkManager = BookmarkManager(this)
+                historyManager = HistoryManager(this)
+                historyManager.purgeExpired()
+
+                initViews()
+                initGeckoView()
+                setupListeners()
+            }
+
+            private fun initViews() {
+                geckoView = findViewById(R.id.geckoView)
+                btnBack = findViewById(R.id.btnBack)
+                btnForward = findViewById(R.id.btnForward)
+                btnReload = findViewById(R.id.btnReload)
+                btnBookmarkStar = findViewById(R.id.btnBookmarkStar)
+                etUrl = findViewById(R.id.etUrl)
+                btnBookmarks = findViewById(R.id.btnBookmarks)
+                btnHistory = findViewById(R.id.btnHistory)
+                progressBar = findViewById(R.id.progressBar)
+            }
+
+            private fun initGeckoView() {
+                geckoSession = GeckoSession()
+                geckoSession.settings.useTrackingProtection = true
+
+                geckoRuntime = GeckoRuntime.getDefault(this)
+                geckoSession.open(geckoRuntime)
+                geckoView.setSession(geckoSession)
+
+                geckoSession.progressDelegate = object : GeckoSession.ProgressDelegate {
+                    override fun onPageStart(session: GeckoSession, url: String) {
+                        currentUrl = url
+                        isLoadingPage = true
+                        etUrl.setText(url)
+                        progressBar.visibility = View.VISIBLE
+                        progressBar.progress = 15
+                        btnReload.setImageResource(R.drawable.ic_close)
+                    }
+
+                    override fun onPageStop(session: GeckoSession, success: Boolean) {
+                        isLoadingPage = false
+                        progressBar.visibility = View.GONE
+                        btnReload.setImageResource(R.drawable.ic_refresh)
+
+                        if (currentUrl.isNotEmpty() && currentUrl != "about:blank") {
+                            val title = if (currentTitle.isNotEmpty()) currentTitle else currentUrl
+                            historyManager.addEntry(title, currentUrl)
+                            updateBookmarkStarState(currentUrl)
+                        }
+
+                        injectYouTubeAdBlocker()
+                    }
+
+                    override fun onProgressChange(session: GeckoSession, progress: Int) {
+                        if (progress < 100) {
+                            progressBar.visibility = View.VISIBLE
+                            progressBar.progress = progress
+                        } else {
+                            progressBar.visibility = View.GONE
+                        }
+                    }
+                }
+
+                geckoSession.navigationDelegate = object : GeckoSession.NavigationDelegate {
+                    override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
+                        btnBack.isEnabled = canGoBack
+                        btnBack.alpha = if (canGoBack) 1.0f else 0.4f
+                    }
+
+                    override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) {
+                        btnForward.isEnabled = canGoForward
+                        btnForward.alpha = if (canGoForward) 1.0f else 0.4f
+                    }
+                }
+
+                geckoSession.contentDelegate = object : GeckoSession.ContentDelegate {
+                    override fun onTitleChange(session: GeckoSession, title: String?) {
+                        if (!title.isNullOrBlank()) {
+                            currentTitle = title
+                        }
+                    }
+                }
+
+                val startUrl = intent?.dataString ?: DEFAULT_URL
+                loadUrl(startUrl)
+            }
+
+            private fun injectYouTubeAdBlocker() {
+                val script = """
+                    (function() {
+                        try {
+                            var css = 'ins.adsbygoogle, .adsbygoogle, ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-banner-promo-renderer, .ytp-ad-module, .ytp-ad-overlay-container, .video-ads, #player-ads, .ad-container, ytm-promoted-sparkles-web-renderer, ytm-companion-ad-renderer { display: none !important; }';
+                            var s = document.createElement('style'); s.textContent = css; (document.head || document.documentElement).appendChild(s);
+
+                            if (location.hostname.indexOf('youtube.com') !== -1) {
+                                setInterval(function() {
+                                    var v = document.querySelector('video');
+                                    if (v && document.querySelector('.ad-showing, .ad-interrupting')) {
+                                        v.muted = true;
+                                        v.playbackRate = 16.0;
+                                        if (isFinite(v.duration)) { v.currentTime = v.duration; }
+                                    }
+                                    var btn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .videoAdUiSkipButton');
+                                    if (btn) btn.click();
+                                    var cls = document.querySelector('.ytp-ad-overlay-close-button, #dismiss-button');
+                                    if (cls) cls.click();
+                                }, 200);
+                            }
+                        } catch(e) {}
+                    })();
+                """.trimIndent()
+                geckoSession.evaluateScript(script)
+            }
+
+            private fun setupListeners() {
+                btnBack.setOnClickListener { geckoSession.goBack() }
+                btnForward.setOnClickListener { geckoSession.goForward() }
+                btnReload.setOnClickListener {
+                    if (isLoadingPage) geckoSession.stop() else geckoSession.reload()
+                }
+
+                btnBookmarkStar.setOnClickListener {
+                    if (currentUrl.isBlank() || currentUrl == "about:blank") return@setOnClickListener
+                    val isNowBookmarked = bookmarkManager.toggleBookmark(currentTitle, currentUrl)
+                    updateBookmarkStarState(currentUrl)
+                    val msg = if (isNowBookmarked) getString(R.string.bookmark_added) else getString(R.string.bookmark_removed)
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                }
+
+                etUrl.setOnEditorActionListener { _, actionId, event ->
+                    if (actionId == EditorInfo.IME_ACTION_GO ||
+                        (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
+                    ) {
+                        loadUrl(etUrl.text.toString().trim())
+                        hideKeyboard()
+                        return@setOnEditorActionListener true
+                    }
+                    false
+                }
+
+                btnBookmarks.setOnClickListener { showBookmarksDialog() }
+                btnHistory.setOnClickListener { showHistoryDialog() }
+            }
+
+            private fun loadUrl(input: String) {
+                if (input.isBlank()) return
+                val targetUrl = when {
+                    input.startsWith("http://") || input.startsWith("https://") -> input
+                    Patterns.WEB_URL.matcher(input).matches() || (input.contains(".") && !input.contains(" ")) -> "https://$input"
+                    else -> "https://lite.duckduckgo.com/lite/?q=" + URLEncoder.encode(input, "UTF-8")
+                }
+                geckoSession.loadUri(targetUrl)
+            }
+
+            private fun updateBookmarkStarState(url: String?) {
+                val isBookmarked = bookmarkManager.isBookmarked(url)
+                if (isBookmarked) {
+                    btnBookmarkStar.setImageResource(R.drawable.ic_star_filled)
+                    btnBookmarkStar.setColorFilter(ContextCompat.getColor(this, R.color.accent_yellow))
+                } else {
+                    btnBookmarkStar.setImageResource(R.drawable.ic_star)
+                    btnBookmarkStar.setColorFilter(ContextCompat.getColor(this, R.color.text_secondary))
+                }
+            }
+
+            private fun showBookmarksDialog() {
+                val dialog = Dialog(this, R.style.CustomDialogTheme)
+                dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+                dialog.setContentView(R.layout.dialog_bookmarks)
+                dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+                val lvBookmarks = dialog.findViewById<ListView>(R.id.lvBookmarks)
+                val tvEmpty = dialog.findViewById<TextView>(R.id.tvEmptyBookmarks)
+                val btnClose = dialog.findViewById<ImageButton>(R.id.btnCloseBookmarks)
+
+                dialog.findViewById<Button>(R.id.btnShortcutDuck)?.setOnClickListener {
+                    loadUrl("https://lite.duckduckgo.com")
+                    dialog.dismiss()
+                }
+                dialog.findViewById<Button>(R.id.btnShortcutMaps)?.setOnClickListener {
+                    loadUrl("https://maps.google.com")
+                    dialog.dismiss()
+                }
+                dialog.findViewById<Button>(R.id.btnShortcutYouTube)?.setOnClickListener {
+                    loadUrl("https://m.youtube.com")
+                    dialog.dismiss()
+                }
+                dialog.findViewById<Button>(R.id.btnShortcutWiki)?.setOnClickListener {
+                    loadUrl("https://en.m.wikipedia.org")
+                    dialog.dismiss()
+                }
+
+                btnClose.setOnClickListener { dialog.dismiss() }
+
+                val list = bookmarkManager.getAllBookmarks()
+                if (list.isEmpty()) {
+                    lvBookmarks.visibility = View.GONE
+                    tvEmpty.visibility = View.VISIBLE
+                } else {
+                    lvBookmarks.visibility = View.VISIBLE
+                    tvEmpty.visibility = View.GONE
+
+                    lvBookmarks.adapter = object : BaseAdapter() {
+                        override fun getCount(): Int = list.size
+                        override fun getItem(position: Int): BookmarkItem = list[position]
+                        override fun getItemId(position: Int): Long = position.toLong()
+
+                        override fun getView(pos: Int, convertView: View?, parent: ViewGroup?): View {
+                            val view = convertView ?: LayoutInflater.from(this@MainActivity)
+                                .inflate(R.layout.item_bookmark, parent, false)
+                            val item = getItem(pos)
+
+                            val tvTitle = view.findViewById<TextView>(R.id.tvBookmarkTitle)
+                            val tvUrl = view.findViewById<TextView>(R.id.tvBookmarkUrl)
+                            val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteBookmark)
+
+                            tvTitle.text = item.title
+                            tvUrl.text = item.url
+
+                            view.findViewById<View>(R.id.llBookmarkInfo).setOnClickListener {
+                                loadUrl(item.url)
+                                dialog.dismiss()
+                            }
+
+                            btnDelete.setOnClickListener {
+                                bookmarkManager.removeBookmarkById(item.id)
+                                updateBookmarkStarState(currentUrl)
+                                dialog.dismiss()
+                                showBookmarksDialog()
+                            }
+
+                            return view
+                        }
+                    }
+                }
+                dialog.show()
+            }
+
+            private fun showHistoryDialog() {
+                val dialog = Dialog(this, R.style.CustomDialogTheme)
+                dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+                dialog.setContentView(R.layout.dialog_history)
+                dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+                val lvHistory = dialog.findViewById<ListView>(R.id.lvHistory)
+                val tvEmpty = dialog.findViewById<TextView>(R.id.tvEmptyHistory)
+                val btnClose = dialog.findViewById<ImageButton>(R.id.btnCloseHistory)
+                val btnClearAll = dialog.findViewById<Button>(R.id.btnClearAllData)
+
+                btnClose.setOnClickListener { dialog.dismiss() }
+
+                val list = historyManager.getRecentHistory()
+                if (list.isEmpty()) {
+                    lvHistory.visibility = View.GONE
+                    tvEmpty.visibility = View.VISIBLE
+                } else {
+                    lvHistory.visibility = View.VISIBLE
+                    tvEmpty.visibility = View.GONE
+
+                    lvHistory.adapter = object : BaseAdapter() {
+                        override fun getCount(): Int = list.size
+                        override fun getItem(position: Int): HistoryItem = list[position]
+                        override fun getItemId(position: Int): Long = list[position].id
+
+                        override fun getView(pos: Int, convertView: View?, parent: ViewGroup?): View {
+                            val view = convertView ?: LayoutInflater.from(this@MainActivity)
+                                .inflate(R.layout.item_history, parent, false)
+                            val item = getItem(pos)
+
+                            val tvTitle = view.findViewById<TextView>(R.id.tvHistoryTitle)
+                            val tvUrl = view.findViewById<TextView>(R.id.tvHistoryUrl)
+                            val tvTime = view.findViewById<TextView>(R.id.tvHistoryTime)
+                            val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteHistoryEntry)
+
+                            tvTitle.text = item.title
+                            tvUrl.text = item.url
+                            tvTime.text = item.getFormattedTime()
+
+                            view.findViewById<View>(R.id.llHistoryInfo).setOnClickListener {
+                                loadUrl(item.url)
+                                dialog.dismiss()
+                            }
+
+                            btnDelete.setOnClickListener {
+                                historyManager.deleteEntry(item.id)
+                                dialog.dismiss()
+                                showHistoryDialog()
+                            }
+
+                            return view
+                        }
+                    }
+                }
+
+                btnClearAll.setOnClickListener {
+                    AlertDialog.Builder(this)
+                        .setTitle("Clear All Data")
+                        .setMessage("Clear all browsing history and session data?")
+                        .setPositiveButton("Clear Everything") { _, _ ->
+                            historyManager.clearAll()
+                            geckoRuntime.webResponseCache.clear()
+                            dialog.dismiss()
+                            Toast.makeText(this, getString(R.string.data_cleared), Toast.LENGTH_LONG).show()
+                        }
+                        .setNegativeButton(R.string.action_cancel, null)
+                        .show()
+                }
+
+                dialog.show()
+            }
+
+            private fun hideKeyboard() {
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.hideSoftInputFromWindow(etUrl.windowToken, 0)
+                etUrl.clearFocus()
+            }
+
+            override fun onBackPressed() {
+                geckoSession.goBack()
+            }
+
+            override fun onDestroy() {
+                super.onDestroy()
+                geckoSession.close()
+            }
+
+            companion object {
+                private const val DEFAULT_URL = "https://lite.duckduckgo.com"
+            }
+        }
+        EOF
+
         gradle assembleDebug --stacktrace
 
-    - name: Upload APK
+    - name: Upload GeckoView Version 2.0 APK
       uses: actions/upload-artifact@v4
       with:
-        name: OlaAirBrowser-APK
+        name: OlaAirBrowser-GeckoView-S1-APK
         path: OlaAirBrowser-Project/app/build/outputs/apk/**/*.apk
