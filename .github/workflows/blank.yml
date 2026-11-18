@@ -24,10 +24,11 @@ jobs:
       with:
         gradle-version: '8.5'
 
-    - name: Build Release APK
+    - name: Build Android APK
       working-directory: OlaAirBrowser-Project
       run: |
-        gradle assembleRelease --stacktrace
+        sed -i 's/compileSdk = 29/compileSdk = 34/g' app/build.gradle.kts
+        gradle assembleDebug assembleRelease --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
