@@ -28,7 +28,7 @@ jobs:
       working-directory: OlaAirBrowser-Project
       run: |
         sed -i 's/compileSdk = 29/compileSdk = 34/g' app/build.gradle.kts
-        gradle assembleDebug assembleRelease --stacktrace
+        gradle assembleDebug --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
