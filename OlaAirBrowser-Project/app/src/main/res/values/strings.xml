@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ola Air Browser</string>
+    <string name="default_url">https://lite.duckduckgo.com</string>
+    <string name="search_hint">Enter URL or search…</string>
+    
+    <!-- Action descriptions -->
+    <string name="action_back">Back</string>
+    <string name="action_forward">Forward</string>
+    <string name="action_reload">Reload</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_bookmark">Bookmark current page</string>
+    <string name="action_bookmarks_list">Open Bookmarks</string>
+    <string name="action_history">History &amp; Privacy</string>
+    <string name="action_adblock">Toggle Ad-Blocker</string>
+    <string name="action_new_tab">Open New Tab</string>
+    <string name="action_close_tab">Close Tab</string>
+    <string name="action_fullscreen">Toggle Fullscreen</string>
+    <string name="action_clear_all">Clear All Data Now</string>
+    <string name="action_cancel">Cancel</string>
+    
+    <!-- Dialog & status strings -->
+    <string name="adblock_enabled">Ad &amp; Tracker Blocker: ACTIVE</string>
+    <string name="adblock_disabled">Ad &amp; Tracker Blocker: DISABLED</string>
+    <string name="max_tabs_reached">Maximum 5 tabs open. Close an existing tab first.</string>
+    <string name="tab_prefix">Tab %d</string>
+    <string name="bookmarks_title">Quick Bookmarks</string>
+    <string name="history_title">24-Hour Zero-Tracking History</string>
+    <string name="history_empty">No history in the last 24 hours.</string>
+    <string name="bookmarks_empty">No bookmarks saved yet.</string>
+    <string name="bookmark_added">Bookmark saved</string>
+    <string name="bookmark_removed">Bookmark removed</string>
+    <string name="data_cleared">History, cache, and cookies purged successfully.</string>
+    <string name="privacy_badge">Zero Telemetry • Auto-Purges Every 24h</string>
+</resources>

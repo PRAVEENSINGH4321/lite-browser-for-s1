@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:orientation="vertical">
+
+    <!-- Top Navigation Bar (Touch-friendly 46dp) -->
+    <LinearLayout
+        android:id="@+id/navBar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/nav_bar_height"
+        android:background="@color/bg_surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <!-- Back Button -->
+        <ImageButton
+            android:id="@+id/btnBack"
+            style="@style/NavButton"
+            android:contentDescription="@string/action_back"
+            android:src="@drawable/ic_back" />
+
+        <!-- Forward Button -->
+        <ImageButton
+            android:id="@+id/btnForward"
+            style="@style/NavButton"
+            android:contentDescription="@string/action_forward"
+            android:src="@drawable/ic_forward" />
+
+        <!-- Reload / Stop Button -->
+        <ImageButton
+            android:id="@+id/btnReload"
+            style="@style/NavButton"
+            android:contentDescription="@string/action_reload"
+            android:src="@drawable/ic_refresh" />
+
+        <!-- Bookmark Star Button (Toggles bookmark for current URL) -->
+        <ImageButton
+            android:id="@+id/btnBookmarkStar"
+            style="@style/NavButton"
+            android:contentDescription="@string/action_bookmark"
+            android:src="@drawable/ic_star" />
+
+        <!-- URL / Search Input Bar -->
+        <EditText
+            android:id="@+id/etUrl"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_url_bar"
+            android:hint="@string/search_hint"
+            android:imeOptions="actionGo"
+            android:inputType="textUri"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="@dimen/text_regular" />
+
+        <!-- Host-Based Ad-Blocker Toggle Button -->
+        <ImageButton
+            android:id="@+id/btnAdBlock"
+            style="@style/NavButton"
+            android:contentDescription="@string/action_adblock"
+            android:src="@drawable/ic_shield"
+            android:tint="@color/accent_green" />
+
+        <!-- Bookmarks List Button -->
+        <ImageButton
+            android:id="@+id/btnBookmarks"
+            style="@style/NavButton"
+            android:contentDescription="@string/action_bookmarks_list"
+            android:src="@drawable/ic_bookmarks" />
+
+        <!-- 24-Hour Expiring History & Privacy Button -->
+        <ImageButton
+            android:id="@+id/btnHistory"
+            style="@style/NavButton"
+            android:contentDescription="@string/action_history"
+            android:src="@drawable/ic_history" />
+
+    </LinearLayout>
+
+    <!-- Tab Switcher Bar (Height: 36dp, Max 5 Tabs) -->
+    <LinearLayout
+        android:id="@+id/tabBar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/tab_bar_height"
+        android:background="@color/bg_surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
+
+        <HorizontalScrollView
+            android:id="@+id/tabScrollView"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:fadingEdge="none"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <!-- Container where up to 5 tab items are dynamically placed -->
+            <LinearLayout
+                android:id="@+id/tabLayoutContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="bottom"
+                android:orientation="horizontal" />
+
+        </HorizontalScrollView>
+
+        <!-- Add Tab Button (Capped at 5) -->
+        <ImageButton
+            android:id="@+id/btnNewTab"
+            android:layout_width="38dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_button"
+            android:contentDescription="@string/action_new_tab"
+            android:padding="6dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_add"
+            android:tint="@color/accent_cyan" />
+
+    </LinearLayout>
+
+    <!-- Web Page Loading Progress Bar (2dp thin line) -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:max="100"
+        android:progressBackgroundTint="@android:color/transparent"
+        android:progressTint="@color/progress_color"
+        android:visibility="gone" />
+
+    <!-- Main Content Frame (Hosts Active WebView) -->
+    <FrameLayout
+        android:id="@+id/webContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/bg_dark">
+
+        <!-- Default Quick-Access Dashboard (Visible when tab has no URL loaded) -->
+        <LinearLayout
+            android:id="@+id/quickDashboard"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="@string/app_name"
+                android:textColor="@color/accent_cyan"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                android:text="@string/privacy_badge"
+                android:textColor="@color/text_muted"
+                android:textSize="@dimen/text_small" />
+
+            <!-- Pre-populated Quick Shortcuts for 800x480 Cockpit Display -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnQuickDuck"
+                    android:layout_width="140dp"
+                    android:layout_height="48dp"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_quick_shortcut"
+                    android:text="DuckDuckGo"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_regular" />
+
+                <Button
+                    android:id="@+id/btnQuickMaps"
+                    android:layout_width="140dp"
+                    android:layout_height="48dp"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_quick_shortcut"
+                    android:text="Google Maps"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_regular" />
+
+                <Button
+                    android:id="@+id/btnQuickYouTube"
+                    android:layout_width="140dp"
+                    android:layout_height="48dp"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_quick_shortcut"
+                    android:text="YouTube"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_regular" />
+
+                <Button
+                    android:id="@+id/btnQuickWikipedia"
+                    android:layout_width="140dp"
+                    android:layout_height="48dp"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_quick_shortcut"
+                    android:text="Wikipedia"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_regular" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</LinearLayout>

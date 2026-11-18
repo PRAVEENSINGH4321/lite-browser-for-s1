@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- High-Contrast Automotive Dark Theme Colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="bg_dark">#FF121212</color>
+    <color name="bg_surface">#FF1C1D21</color>
+    <color name="bg_surface_elevated">#FF2A2B30</color>
+    <color name="bg_input">#FF26272C</color>
+    
+    <!-- High-visibility cockpit accents -->
+    <color name="accent_cyan">#FF00E5FF</color>
+    <color name="accent_cyan_glow">#3300E5FF</color>
+    <color name="accent_green">#FF00E676</color>
+    <color name="accent_yellow">#FFFFD600</color>
+    <color name="accent_red">#FFFF5252</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB0B3B8</color>
+    <color name="text_muted">#FF70747E</color>
+    
+    <!-- Tab styling -->
+    <color name="tab_active_bg">#FF2A2C35</color>
+    <color name="tab_inactive_bg">#FF16171B</color>
+    <color name="tab_border_active">#FF00E5FF</color>
+    <color name="tab_border_inactive">#FF222329</color>
+    
+    <!-- Progress bar -->
+    <color name="progress_color">#FF00E5FF</color>
+    <color name="divider_color">#FF2D2F36</color>
+</resources>
