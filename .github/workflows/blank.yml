@@ -28,6 +28,8 @@ jobs:
       working-directory: OlaAirBrowser-Project
       run: |
         sed -i 's/compileSdk = 29/compileSdk = 34/g' app/build.gradle.kts
+        sed -i 's/view\.title/view?.title/g' app/src/main/java/com/ola/browser/MainActivity.kt
+        sed -i 's/view\.url/view?.url/g' app/src/main/java/com/ola/browser/MainActivity.kt
         gradle assembleDebug --stacktrace
 
     - name: Upload APK
