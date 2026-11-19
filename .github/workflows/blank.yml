@@ -28,24 +28,42 @@ jobs:
 
     - name: Rebuild with GeckoView Engine & S1 Icon
       run: |
-        # 1. Setup Gradle init script to redirect Maven Central to Google Cloud Storage mirror (bypasses 429 rate limit)
+        # 1. Global Gradle init script redirecting Sonatype to Google Cloud Storage mirror (eliminates 429 rate limit)
         mkdir -p ~/.gradle/init.d
         cat << 'EOF' > ~/.gradle/init.d/mirrors.init.gradle
         allprojects {
             buildscript {
-                repositories.configureEach { repo ->
+                repositories.all { repo ->
                     if (repo instanceof MavenArtifactRepository) {
                         def url = repo.url.toString()
-                        if (url.contains("repo1.maven.org/maven2") || url.contains("repo.maven.apache.org/maven2")) {
+                        if (url.contains("repo1.maven.org") || url.contains("repo.maven.apache.org")) {
                             repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
                         }
                     }
                 }
             }
-            repositories.configureEach { repo ->
+            repositories.all { repo ->
                 if (repo instanceof MavenArtifactRepository) {
                     def url = repo.url.toString()
-                    if (url.contains("repo1.maven.org/maven2") || url.contains("repo.maven.apache.org/maven2")) {
+                    if (url.contains("repo1.maven.org") || url.contains("repo.maven.apache.org")) {
+                        repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
+                    }
+                }
+            }
+        }
+        gradle.settingsEvaluated { settings ->
+            settings.pluginManagement.repositories.all { repo ->
+                if (repo instanceof MavenArtifactRepository) {
+                    def url = repo.url.toString()
+                    if (url.contains("repo1.maven.org") || url.contains("repo.maven.apache.org")) {
+                        repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
+                    }
+                }
+            }
+            settings.dependencyResolutionManagement.repositories.all { repo ->
+                if (repo instanceof MavenArtifactRepository) {
+                    def url = repo.url.toString()
+                    if (url.contains("repo1.maven.org") || url.contains("repo.maven.apache.org")) {
                         repo.setUrl("https://maven-central.storage-download.googleapis.com/maven2/")
                     }
                 }
@@ -53,14 +71,18 @@ jobs:
         }
         EOF
 
-        # 2. Add Google Mirror and Mozilla Maven repository to settings.gradle.kts
+        # 2. Enter project folder
+        if [ -d "OlaAirBrowser-Project" ]; then
+            cd OlaAirBrowser-Project
+        fi
+
+        # 3. Configure settings.gradle.kts with Google Mirror & Mozilla repository
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
                 google()
                 maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
                 gradlePluginPortal()
-                mavenCentral()
             }
         }
         dependencyResolutionManagement {
@@ -68,7 +90,6 @@ jobs:
             repositories {
                 google()
                 maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
-                mavenCentral()
                 maven { url = uri("https://maven.mozilla.org/maven2/") }
             }
         }
@@ -76,7 +97,8 @@ jobs:
         include(":app")
         EOF
 
-        # 3. Update app/build.gradle.kts for GeckoView and Java 17
+        # 4. Configure app/build.gradle.kts with GeckoView 125, compileSdk 34, targetSdk 29, Java 17
+        mkdir -p app
         cat << 'EOF' > app/build.gradle.kts
         plugins {
             id("com.android.application")
@@ -128,7 +150,7 @@ jobs:
         }
         EOF
 
-        # 4. Create Custom S1 Cockpit App Icon
+        # 5. Create Custom S1 Cockpit App Icon
         mkdir -p app/src/main/res/drawable
         cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
         <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -146,9 +168,53 @@ jobs:
         </vector>
         EOF
         cp app/src/main/res/drawable/ic_launcher.xml app/src/main/res/drawable/ic_launcher_round.xml
-        sed -i 's/@android:drawable\/sym_def_app_icon/@drawable\/ic_launcher/g' app/src/main/AndroidManifest.xml
 
-        # 5. Update activity_main.xml to use GeckoView
+        # 6. Update AndroidManifest.xml
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.ola.browser">
+
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+            <application
+                android:allowBackup="false"
+                android:hardwareAccelerated="true"
+                android:icon="@drawable/ic_launcher"
+                android:label="@string/app_name"
+                android:roundIcon="@drawable/ic_launcher_round"
+                android:supportsRtl="true"
+                android:theme="@style/Theme.OlaBrowser"
+                android:usesCleartextTraffic="true">
+
+                <activity
+                    android:name=".MainActivity"
+                    android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+                    android:exported="true"
+                    android:launchMode="singleTask"
+                    android:screenOrientation="landscape"
+                    android:windowSoftInputMode="adjustPan">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                    <intent-filter>
+                        <action android:name="android.intent.action.VIEW" />
+                        <category android:name="android.intent.category.DEFAULT" />
+                        <category android:name="android.intent.category.BROWSABLE" />
+                        <data android:scheme="http" />
+                        <data android:scheme="https" />
+                    </intent-filter>
+                </activity>
+
+            </application>
+
+        </manifest>
+        EOF
+
+        # 7. Update activity_main.xml to use GeckoView
+        mkdir -p app/src/main/res/layout
         cat << 'EOF' > app/src/main/res/layout/activity_main.xml
         <?xml version="1.0" encoding="utf-8"?>
         <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -237,13 +303,17 @@ jobs:
                 android:id="@+id/geckoView"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1"
-                android:background="@color/bg_dark" />
+                android:layout_weight="1" />
 
         </LinearLayout>
         EOF
 
-        # 6. Write the GeckoView-powered MainActivity.kt
+        # 8. Clean up unused legacy WebView files
+        rm -f app/src/main/java/com/ola/browser/TabManager.kt
+        rm -f app/src/main/java/com/ola/browser/AdBlocker.kt
+
+        # 9. Update MainActivity.kt for GeckoView
+        mkdir -p app/src/main/java/com/ola/browser
         cat << 'EOF' > app/src/main/java/com/ola/browser/MainActivity.kt
         package com.ola.browser
 
@@ -273,6 +343,7 @@ jobs:
         import androidx.core.content.ContextCompat
         import org.mozilla.geckoview.GeckoRuntime
         import org.mozilla.geckoview.GeckoSession
+        import org.mozilla.geckoview.GeckoSessionSettings
         import org.mozilla.geckoview.GeckoView
         import java.net.URLEncoder
 
@@ -297,6 +368,7 @@ jobs:
             private var currentUrl: String = ""
             private var currentTitle: String = ""
             private var isLoadingPage: Boolean = false
+            private var canGoBack: Boolean = false
 
             override fun onCreate(savedInstanceState: Bundle?) {
                 super.onCreate(savedInstanceState)
@@ -324,8 +396,10 @@ jobs:
             }
 
             private fun initGeckoView() {
-                geckoSession = GeckoSession()
-                geckoSession.settings.useTrackingProtection = true
+                val settings = GeckoSessionSettings.Builder()
+                    .useTrackingProtection(true)
+                    .build()
+                geckoSession = GeckoSession(settings)
 
                 geckoRuntime = GeckoRuntime.getDefault(this)
                 geckoSession.open(geckoRuntime)
@@ -351,8 +425,6 @@ jobs:
                             historyManager.addEntry(title, currentUrl)
                             updateBookmarkStarState(currentUrl)
                         }
-
-                        injectYouTubeAdBlocker()
                     }
 
                     override fun onProgressChange(session: GeckoSession, progress: Int) {
@@ -367,6 +439,7 @@ jobs:
 
                 geckoSession.navigationDelegate = object : GeckoSession.NavigationDelegate {
                     override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
+                        this@MainActivity.canGoBack = canGoBack
                         btnBack.isEnabled = canGoBack
                         btnBack.alpha = if (canGoBack) 1.0f else 0.4f
                     }
@@ -389,38 +462,21 @@ jobs:
                 loadUrl(startUrl)
             }
 
-            private fun injectYouTubeAdBlocker() {
-                val script = """
-                    (function() {
-                        try {
-                            var css = 'ins.adsbygoogle, .adsbygoogle, ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-banner-promo-renderer, .ytp-ad-module, .ytp-ad-overlay-container, .video-ads, #player-ads, .ad-container, ytm-promoted-sparkles-web-renderer, ytm-companion-ad-renderer { display: none !important; }';
-                            var s = document.createElement('style'); s.textContent = css; (document.head || document.documentElement).appendChild(s);
-
-                            if (location.hostname.indexOf('youtube.com') !== -1) {
-                                setInterval(function() {
-                                    var v = document.querySelector('video');
-                                    if (v && document.querySelector('.ad-showing, .ad-interrupting')) {
-                                        v.muted = true;
-                                        v.playbackRate = 16.0;
-                                        if (isFinite(v.duration)) { v.currentTime = v.duration; }
-                                    }
-                                    var btn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .videoAdUiSkipButton');
-                                    if (btn) btn.click();
-                                    var cls = document.querySelector('.ytp-ad-overlay-close-button, #dismiss-button');
-                                    if (cls) cls.click();
-                                }, 200);
-                            }
-                        } catch(e) {}
-                    })();
-                """.trimIndent()
-                geckoSession.loadUri("javascript:" + script)
-            }
-
             private fun setupListeners() {
-                btnBack.setOnClickListener { geckoSession.goBack() }
-                btnForward.setOnClickListener { geckoSession.goForward() }
+                btnBack.setOnClickListener {
+                    geckoSession.goBack()
+                }
+
+                btnForward.setOnClickListener {
+                    geckoSession.goForward()
+                }
+
                 btnReload.setOnClickListener {
-                    if (isLoadingPage) geckoSession.stop() else geckoSession.reload()
+                    if (isLoadingPage) {
+                        geckoSession.stop()
+                    } else {
+                        geckoSession.reload()
+                    }
                 }
 
                 btnBookmarkStar.setOnClickListener {
@@ -442,8 +498,13 @@ jobs:
                     false
                 }
 
-                btnBookmarks.setOnClickListener { showBookmarksDialog() }
-                btnHistory.setOnClickListener { showHistoryDialog() }
+                btnBookmarks.setOnClickListener {
+                    showBookmarksDialog()
+                }
+
+                btnHistory.setOnClickListener {
+                    showHistoryDialog()
+                }
             }
 
             private fun loadUrl(input: String) {
@@ -496,47 +557,50 @@ jobs:
 
                 btnClose.setOnClickListener { dialog.dismiss() }
 
-                val list = bookmarkManager.getAllBookmarks()
-                if (list.isEmpty()) {
-                    lvBookmarks.visibility = View.GONE
-                    tvEmpty.visibility = View.VISIBLE
-                } else {
-                    lvBookmarks.visibility = View.VISIBLE
-                    tvEmpty.visibility = View.GONE
+                fun reloadList() {
+                    val list = bookmarkManager.getAllBookmarks()
+                    if (list.isEmpty()) {
+                        lvBookmarks.visibility = View.GONE
+                        tvEmpty.visibility = View.VISIBLE
+                    } else {
+                        lvBookmarks.visibility = View.VISIBLE
+                        tvEmpty.visibility = View.GONE
 
-                    lvBookmarks.adapter = object : BaseAdapter() {
-                        override fun getCount(): Int = list.size
-                        override fun getItem(position: Int): BookmarkItem = list[position]
-                        override fun getItemId(position: Int): Long = position.toLong()
+                        lvBookmarks.adapter = object : BaseAdapter() {
+                            override fun getCount(): Int = list.size
+                            override fun getItem(position: Int): BookmarkItem = list[position]
+                            override fun getItemId(position: Int): Long = position.toLong()
 
-                        override fun getView(pos: Int, convertView: View?, parent: ViewGroup?): View {
-                            val view = convertView ?: LayoutInflater.from(this@MainActivity)
-                                .inflate(R.layout.item_bookmark, parent, false)
-                            val item = getItem(pos)
+                            override fun getView(pos: Int, convertView: View?, parent: ViewGroup?): View {
+                                val view = convertView ?: LayoutInflater.from(this@MainActivity)
+                                    .inflate(R.layout.item_bookmark, parent, false)
+                                val item = getItem(pos)
 
-                            val tvTitle = view.findViewById<TextView>(R.id.tvBookmarkTitle)
-                            val tvUrl = view.findViewById<TextView>(R.id.tvBookmarkUrl)
-                            val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteBookmark)
+                                val tvTitle = view.findViewById<TextView>(R.id.tvBookmarkTitle)
+                                val tvUrl = view.findViewById<TextView>(R.id.tvBookmarkUrl)
+                                val btnDelete = view.findViewById<ImageButton>(R.id.btnDeleteBookmark)
 
-                            tvTitle.text = item.title
-                            tvUrl.text = item.url
+                                tvTitle.text = item.title
+                                tvUrl.text = item.url
 
-                            view.findViewById<View>(R.id.llBookmarkInfo).setOnClickListener {
-                                loadUrl(item.url)
-                                dialog.dismiss()
+                                view.findViewById<View>(R.id.llBookmarkInfo).setOnClickListener {
+                                    loadUrl(item.url)
+                                    dialog.dismiss()
+                                }
+
+                                btnDelete.setOnClickListener {
+                                    bookmarkManager.removeBookmarkById(item.id)
+                                    updateBookmarkStarState(currentUrl)
+                                    reloadList()
+                                }
+
+                                return view
                             }
-
-                            btnDelete.setOnClickListener {
-                                bookmarkManager.removeBookmarkById(item.id)
-                                updateBookmarkStarState(currentUrl)
-                                dialog.dismiss()
-                                showBookmarksDialog()
-                            }
-
-                            return view
                         }
                     }
                 }
+
+                reloadList()
                 dialog.show()
             }
 
@@ -622,7 +686,11 @@ jobs:
             }
 
             override fun onBackPressed() {
-                geckoSession.goBack()
+                if (canGoBack) {
+                    geckoSession.goBack()
+                } else {
+                    super.onBackPressed()
+                }
             }
 
             override fun onDestroy() {
@@ -636,12 +704,17 @@ jobs:
         }
         EOF
 
-        # 7. Compile the GeckoView APK
-        gradle assembleDebug --stacktrace
+        # 10. Build the GeckoView APK using Gradle 8.5
+        chmod +x ./gradlew 2>/dev/null || true
+        ./gradlew assembleDebug --stacktrace || gradle assembleDebug --stacktrace
+
+        # 11. Stage APK to repository root for reliable artifact upload
+        mkdir -p "$GITHUB_WORKSPACE/output-apk"
+        find . -name "*.apk" -type f -exec cp {} "$GITHUB_WORKSPACE/output-apk/" \;
 
     - name: Upload GeckoView APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: OlaAirBrowser-GeckoView-S1-APK
-        path: app/build/outputs/apk/debug/*.apk
+        path: output-apk/*.apk
         if-no-files-found: error
